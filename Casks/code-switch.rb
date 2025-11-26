@@ -3,12 +3,12 @@ cask "code-switch" do
   
   # ARM64 版本
   if Hardware::CPU.arm?
-    sha256 "PLACEHOLDER_ARM64_SHA256"
-    url "https://github.com/onyxio0/code-switch/releases/download/v#{version}/codeswitch-macos-arm64.zip"
+    sha256 "c7b9965702fa5139fe97d28b32f1f0554002e9b347f35544d11b5fa854760c06"
+    url "https://github.com/onyxio0/code-switch/releases/download/v0.1.0/codeswitch-macos-arm64.zip"
   else
     # Intel 版本
-    sha256 "PLACEHOLDER_AMD64_SHA256"
-    url "https://github.com/onyxio0/code-switch/releases/download/v#{version}/codeswitch-macos-amd64.zip"
+    sha256 "113c8bbcd64efbd446d0447ca5ee866bc05b55cfea25ffc0206b7a15db187f08"
+    url "https://github.com/onyxio0/code-switch/releases/download/v0.1.0/codeswitch-macos-amd64.zip"
   end
 
   name "Code Switch"
@@ -20,8 +20,6 @@ cask "code-switch" do
     strategy :github_latest
   end
 
-  # 根据 release.yml 中的构建流程，应该是 codeswitch.app 或 CodeSwitch.app
-  # 等 release 构建完成后可以确认确切名称
   app "codeswitch.app"
 
   zap trash: [
