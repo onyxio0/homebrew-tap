@@ -22,9 +22,19 @@ cask "ccnexus" do
 
   app "ccNexus.app"
 
+  # 卸载时清理所有相关文件
+  # 注意：这些路径需要根据实际应用使用情况调整
   zap trash: [
     "~/Library/Application Support/ccNexus",
+    "~/Library/Application Support/com.ccNexus",
     "~/Library/Caches/ccNexus",
+    "~/Library/Caches/com.ccNexus",
     "~/Library/Preferences/com.ccNexus.plist",
+    "~/Library/Preferences/ccNexus.plist",
+    "~/Library/Logs/ccNexus",
+    "~/Library/Saved Application State/com.ccNexus.savedState",
+    "~/Library/WebKit/com.ccNexus",
+    "~/.ccnexus",
+    "~/.config/ccnexus",
   ]
 end
