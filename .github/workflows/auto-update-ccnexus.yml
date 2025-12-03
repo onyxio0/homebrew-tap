@@ -1,0 +1,135 @@
+name: Auto Update ccNexus
+
+on:
+  # 每天 UTC 时间 00:00 自动运行
+  schedule:
+    - cron: '0 0 * * *'
+  
+  # 也可以手动触发
+  workflow_dispatch:
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Get latest ccNexus release
+        id: latest
+        run: |
+          # 获取最新 release 信息
+          LATEST_JSON=$(curl -s https://api.github.com/repos/lich0821/ccNexus/releases/latest)
+          VERSION=$(echo "$LATEST_JSON" | jq -r '.tag_name' | sed 's/v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Latest version: $VERSION"
+      
+      - name: Check current version
+        id: current
+        run: |
+          CURRENT_VERSION=$(grep 'version' Casks/ccnexus.rb | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+      
+      - name: Compare versions
+        id: compare
+        run: |
+          if [ "${{ steps.latest.outputs.version }}" != "${{ steps.current.outputs.version }}" ]; then
+            echo "needs_update=true" >> $GITHUB_OUTPUT
+            echo "🆕 New version available: ${{ steps.latest.outputs.version }}"
+          else
+            echo "needs_update=false" >> $GITHUB_OUTPUT
+            echo "✅ Already up to date"
+          fi
+      
+      - name: Download and calculate SHA256
+        if: steps.compare.outputs.needs_update == 'true'
+        id: sha
+        run: |
+          VERSION="${{ steps.latest.outputs.version }}"
+          
+          ARM64_URL="https://github.com/lich0821/ccNexus/releases/download/v${VERSION}/ccNexus-v${VERSION}-darwin-arm64.zip"
+          AMD64_URL="https://github.com/lich0821/ccNexus/releases/download/v${VERSION}/ccNexus-v${VERSION}-darwin-amd64.zip"
+          
+          echo "Calculating ARM64 SHA256..."
+          ARM64_SHA=$(curl -sL "$ARM64_URL" | sha256sum | awk '{print $1}')
+          
+          echo "Calculating AMD64 SHA256..."
+          AMD64_SHA=$(curl -sL "$AMD64_URL" | sha256sum | awk '{print $1}')
+          
+          echo "arm64_sha=$ARM64_SHA" >> $GITHUB_OUTPUT
+          echo "amd64_sha=$AMD64_SHA" >> $GITHUB_OUTPUT
+          
+          echo "ARM64 SHA256: $ARM64_SHA"
+          echo "AMD64 SHA256: $AMD64_SHA"
+      
+      - name: Update Cask file
+        if: steps.compare.outputs.needs_update == 'true'
+        run: |
+          VERSION="${{ steps.latest.outputs.version }}"
+          ARM64_SHA="${{ steps.sha.outputs.arm64_sha }}"
+          AMD64_SHA="${{ steps.sha.outputs.amd64_sha }}"
+          
+          cat > Casks/ccnexus.rb << 'EOF'
+          cask "ccnexus" do
+            version "VERSION_PLACEHOLDER"
+            
+            # ARM64 版本
+            if Hardware::CPU.arm?
+              sha256 "ARM64_SHA_PLACEHOLDER"
+              url "https://github.com/lich0821/ccNexus/releases/download/v#{version}/ccNexus-v#{version}-darwin-arm64.zip"
+            else
+              # Intel 版本
+              sha256 "AMD64_SHA_PLACEHOLDER"
+              url "https://github.com/lich0821/ccNexus/releases/download/v#{version}/ccNexus-v#{version}-darwin-amd64.zip"
+            end
+
+            name "ccNexus"
+            desc "Intelligent API gateway for Claude Code - rotate endpoints and monitor usage"
+            homepage "https://github.com/lich0821/ccNexus"
+
+            livecheck do
+              url :url
+              strategy :github_latest
+            end
+
+            app "ccNexus.app"
+
+            zap trash: [
+              "~/Library/Application Support/ccNexus",
+              "~/Library/Caches/ccNexus",
+              "~/Library/Preferences/com.ccNexus.plist",
+            ]
+          end
+          EOF
+          
+          # 替换占位符
+          sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" Casks/ccnexus.rb
+          sed -i "s/ARM64_SHA_PLACEHOLDER/${ARM64_SHA}/g" Casks/ccnexus.rb
+          sed -i "s/AMD64_SHA_PLACEHOLDER/${AMD64_SHA}/g" Casks/ccnexus.rb
+      
+      - name: Create Pull Request
+        if: steps.compare.outputs.needs_update == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Update ccnexus to v${{ steps.latest.outputs.version }}"
+          title: "🚀 Update ccnexus to v${{ steps.latest.outputs.version }}"
+          body: |
+            ## 🚀 Auto-update ccnexus
+            
+            - **Current version**: ${{ steps.current.outputs.version }}
+            - **New version**: ${{ steps.latest.outputs.version }}
+            
+            ### Changes
+            - ARM64 SHA256: `${{ steps.sha.outputs.arm64_sha }}`
+            - AMD64 SHA256: `${{ steps.sha.outputs.amd64_sha }}`
+            
+            ### Release Notes
+            https://github.com/lich0821/ccNexus/releases/tag/v${{ steps.latest.outputs.version }}
+            
+            ---
+            *This PR was automatically created by GitHub Actions*
+          branch: auto-update-ccnexus-${{ steps.latest.outputs.version }}
+          delete-branch: true
