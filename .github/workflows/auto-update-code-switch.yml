@@ -1,0 +1,136 @@
+name: Auto Update Code-Switch
+
+on:
+  # 每天 UTC 时间 00:00 自动运行
+  schedule:
+    - cron: '0 0 * * *'
+  
+  # 也可以手动触发
+  workflow_dispatch:
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Get latest Code-Switch release
+        id: latest
+        run: |
+          # 获取最新 release 信息
+          LATEST_JSON=$(curl -s https://api.github.com/repos/Rogers-F/code-switch-R/releases/latest)
+          VERSION=$(echo "$LATEST_JSON" | jq -r '.tag_name' | sed 's/v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Latest version: $VERSION"
+      
+      - name: Check current version
+        id: current
+        run: |
+          CURRENT_VERSION=$(grep 'version' Casks/code-switch.rb | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $CURRENT_VERSION"
+      
+      - name: Compare versions
+        id: compare
+        run: |
+          if [ "${{ steps.latest.outputs.version }}" != "${{ steps.current.outputs.version }}" ]; then
+            echo "needs_update=true" >> $GITHUB_OUTPUT
+            echo "🆕 New version available: ${{ steps.latest.outputs.version }}"
+          else
+            echo "needs_update=false" >> $GITHUB_OUTPUT
+            echo "✅ Already up to date"
+          fi
+      
+      - name: Download and calculate SHA256
+        if: steps.compare.outputs.needs_update == 'true'
+        id: sha
+        run: |
+          VERSION="${{ steps.latest.outputs.version }}"
+          
+          ARM64_URL="https://github.com/Rogers-F/code-switch-R/releases/download/v${VERSION}/codeswitch-macos-arm64.zip"
+          AMD64_URL="https://github.com/Rogers-F/code-switch-R/releases/download/v${VERSION}/codeswitch-macos-amd64.zip"
+          
+          echo "Calculating ARM64 SHA256..."
+          ARM64_SHA=$(curl -sL "$ARM64_URL" | sha256sum | awk '{print $1}')
+          
+          echo "Calculating AMD64 SHA256..."
+          AMD64_SHA=$(curl -sL "$AMD64_URL" | sha256sum | awk '{print $1}')
+          
+          echo "arm64_sha=$ARM64_SHA" >> $GITHUB_OUTPUT
+          echo "amd64_sha=$AMD64_SHA" >> $GITHUB_OUTPUT
+          
+          echo "ARM64 SHA256: $ARM64_SHA"
+          echo "AMD64 SHA256: $AMD64_SHA"
+      
+      - name: Update Cask file
+        if: steps.compare.outputs.needs_update == 'true'
+        run: |
+          VERSION="${{ steps.latest.outputs.version }}"
+          ARM64_SHA="${{ steps.sha.outputs.arm64_sha }}"
+          AMD64_SHA="${{ steps.sha.outputs.amd64_sha }}"
+          
+          cat > Casks/code-switch.rb << 'EOF'
+          cask "code-switch" do
+            version "VERSION_PLACEHOLDER"
+            
+            on_arm do
+              sha256 "ARM64_SHA_PLACEHOLDER"
+              url "https://github.com/Rogers-F/code-switch-R/releases/download/v#{version}/codeswitch-macos-arm64.zip"
+            end
+            
+            on_intel do
+              sha256 "AMD64_SHA_PLACEHOLDER"
+              url "https://github.com/Rogers-F/code-switch-R/releases/download/v#{version}/codeswitch-macos-amd64.zip"
+            end
+
+            name "CodeSwitch"
+            desc "Multi-vendor proxy and management tool for Claude Code & Codex"
+            homepage "https://github.com/Rogers-F/code-switch-R"
+
+            livecheck do
+              url :url
+              strategy :github_latest
+            end
+
+            app "CodeSwitch.app"
+
+            zap trash: [
+              "~/Library/Application Support/CodeSwitch",
+              "~/Library/Caches/CodeSwitch",
+              "~/Library/Preferences/com.codeswitch.plist",
+              "~/Library/Saved Application State/com.codeswitch.savedState",
+            ]
+          end
+          EOF
+          
+          # 替换占位符
+          sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" Casks/code-switch.rb
+          sed -i "s/ARM64_SHA_PLACEHOLDER/${ARM64_SHA}/g" Casks/code-switch.rb
+          sed -i "s/AMD64_SHA_PLACEHOLDER/${AMD64_SHA}/g" Casks/code-switch.rb
+      
+      - name: Create Pull Request
+        if: steps.compare.outputs.needs_update == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Update code-switch to v${{ steps.latest.outputs.version }}"
+          title: "🚀 Update code-switch to v${{ steps.latest.outputs.version }}"
+          body: |
+            ## 🚀 Auto-update code-switch
+            
+            - **Current version**: ${{ steps.current.outputs.version }}
+            - **New version**: ${{ steps.latest.outputs.version }}
+            
+            ### Changes
+            - ARM64 SHA256: `${{ steps.sha.outputs.arm64_sha }}`
+            - AMD64 SHA256: `${{ steps.sha.outputs.amd64_sha }}`
+            
+            ### Release Notes
+            https://github.com/Rogers-F/code-switch-R/releases/tag/v${{ steps.latest.outputs.version }}
+            
+            ---
+            *This PR was automatically created by GitHub Actions*
+          branch: auto-update-code-switch-${{ steps.latest.outputs.version }}
+          delete-branch: true
