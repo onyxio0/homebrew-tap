@@ -8,6 +8,11 @@ on:
   # 也可以手动触发
   workflow_dispatch:
 
+# 添加必要的权限
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   check-and-update:
     runs-on: ubuntu-latest
@@ -112,6 +117,7 @@ jobs:
       
       - name: Create Pull Request
         if: steps.compare.outputs.needs_update == 'true'
+        id: cpr
         uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -131,6 +137,14 @@ jobs:
             https://github.com/Rogers-F/code-switch-R/releases/tag/v${{ steps.latest.outputs.version }}
             
             ---
-            *This PR was automatically created by GitHub Actions*
+            *This PR was automatically created and will be auto-merged by GitHub Actions*
           branch: auto-update-code-switch-${{ steps.latest.outputs.version }}
           delete-branch: true
+      
+      - name: Enable auto-merge for PR
+        if: steps.compare.outputs.needs_update == 'true' && steps.cpr.outputs.pull-request-number != ''
+        run: |
+          echo "Enabling auto-merge for PR #${{ steps.cpr.outputs.pull-request-number }}"
+          gh pr merge ${{ steps.cpr.outputs.pull-request-number }} --auto --squash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
