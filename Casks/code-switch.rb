@@ -1,13 +1,13 @@
 cask "code-switch" do
-  version "2.6.4"
+  version "2.6.6"
   
   on_arm do
-    sha256 "285ef3e932bf9d149561c56bdd8eae2f3edb9894c7b55e78fa983a5444009833"
+    sha256 "156e6683b8b324086ebc2c6d2a19009d73a300a66fce51593204f3d8fa49ea45"
     url "https://github.com/Rogers-F/code-switch-R/releases/download/v#{version}/codeswitch-macos-arm64.zip"
   end
   
   on_intel do
-    sha256 "449ef39a49d512af2ad17adb666c9a733831a333c016c580bc8e6ffecfd8417d"
+    sha256 "3b0879bb4cf71969b6ada048ac339edfe0029d24ac95a80e0b0aa021eb12a07b"
     url "https://github.com/Rogers-F/code-switch-R/releases/download/v#{version}/codeswitch-macos-amd64.zip"
   end
 
