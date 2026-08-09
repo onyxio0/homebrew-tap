@@ -1,13 +1,13 @@
 cask "ccnexus" do
-  version "3.3.1"
+  version "5.0.1"
   
   # ARM64 版本
   if Hardware::CPU.arm?
-    sha256 "654afb0af7ce69d26a728a4e355a6e29c613ea8b62999678b659731b49693ad9"
+    sha256 "a0c1f7dc01c228a81695c633160312b9daa483921995fa30f90406158e00852f"
     url "https://github.com/lich0821/ccNexus/releases/download/v#{version}/ccNexus-v#{version}-darwin-arm64.zip"
   else
     # Intel 版本
-    sha256 "99ded9ed06a1b5716d39124a52693e28b8cb7f8ba6263007c3ff07f0f4dcf30c"
+    sha256 "ad85f6b88b4b6699322b9388786a3183453e12bb0d74ccaade616b9cd47cda31"
     url "https://github.com/lich0821/ccNexus/releases/download/v#{version}/ccNexus-v#{version}-darwin-amd64.zip"
   end
 
@@ -22,19 +22,9 @@ cask "ccnexus" do
 
   app "ccNexus.app"
 
-  # 卸载时清理所有相关文件
-  # 注意：这些路径需要根据实际应用使用情况调整
   zap trash: [
     "~/Library/Application Support/ccNexus",
-    "~/Library/Application Support/com.ccNexus",
     "~/Library/Caches/ccNexus",
-    "~/Library/Caches/com.ccNexus",
     "~/Library/Preferences/com.ccNexus.plist",
-    "~/Library/Preferences/ccNexus.plist",
-    "~/Library/Logs/ccNexus",
-    "~/Library/Saved Application State/com.ccNexus.savedState",
-    "~/Library/WebKit/com.ccNexus",
-    "~/.ccnexus",
-    "~/.config/ccnexus",
   ]
 end
